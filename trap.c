@@ -13,6 +13,7 @@ struct gatedesc idt[256];
 extern uint vectors[];  // in vectors.S: array of 256 entry pointers
 struct spinlock tickslock;
 uint ticks;
+int mappages(pde_t * pgdir, void* va, uint size, uint pa, int perm);
 
 void
 tvinit(void)
@@ -54,6 +55,18 @@ trap(struct trapframe *tf)
       wakeup(&ticks);
       release(&tickslock);
     }
+	//lazy allocation
+	/*
+	if(myproc() != 0 && (tf->cs &3)==3){
+		myproc()->accumticks++;
+		if(myproc()->alarmticks && myproc()->accumticks==myproc()->alarmticks){
+			myproc()->accumticks=0;
+			tf->esp -=4;
+			*(unsigned int*)(tf->esp) = tf->eip;
+			tf->eip=(unsigned int)(myproc()->alarmhandler);
+			}
+		}
+	*/		
     lapiceoi();
     break;
   case T_IRQ0 + IRQ_IDE:
@@ -86,11 +99,27 @@ trap(struct trapframe *tf)
               tf->trapno, cpuid(), tf->eip, rcr2());
       panic("trap");
     }
-    // In user space, assume process misbehaved.
+    
+	if(tf->trapno ==T_PGFLT){
+		uint faultAdd = rcr2();//fault address
+		uint pg_loc = PGROUNDDOWN(faultAdd);//pg round down to fault address
+		//growproc -> allocuvm
+		char* mem=kalloc();
+		if(mem==0){
+			cprintf("allocuvm out of memory\n");
+			break;
+		}
+		memset(mem,0,PGSIZE);
+		mappages(myproc()->pgdir,(char*)pg_loc,PGSIZE,V2P(mem),PTE_W|PTE_U);
+		break;
+
+	}
+	// In user space, assume process misbehaved.
     cprintf("pid %d %s: trap %d err %d on cpu %d "
             "eip 0x%x addr 0x%x--kill proc\n",
             myproc()->pid, myproc()->name, tf->trapno,
             tf->err, cpuid(), tf->eip, rcr2());
+	//rcr2() is page fault address
     myproc()->killed = 1;
   }
 

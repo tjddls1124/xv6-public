@@ -65,7 +65,7 @@ balloc(uint dev)
     for(bi = 0; bi < BPB && b + bi < sb.size; bi++){
       m = 1 << (bi % 8);
       if((bp->data[bi/8] & m) == 0){  // Is block free?
-        bp->data[bi/8] |= m;  // Mark block in use.
+       bp->data[bi/8] |= m;  // Mark block in use.
         log_write(bp);
         brelse(bp);
         bzero(dev, b + bi);
@@ -373,9 +373,10 @@ iunlockput(struct inode *ip)
 static uint
 bmap(struct inode *ip, uint bn)
 {
-  uint addr, *a;
+  uint addr, *a,*b;
   struct buf *bp;
 
+ // NDIRECT decrease 12 to 11 in fs.h
   if(bn < NDIRECT){
     if((addr = ip->addrs[bn]) == 0)
       ip->addrs[bn] = addr = balloc(ip->dev);
@@ -388,13 +389,37 @@ bmap(struct inode *ip, uint bn)
     if((addr = ip->addrs[NDIRECT]) == 0)
       ip->addrs[NDIRECT] = addr = balloc(ip->dev);
     bp = bread(ip->dev, addr);
-    a = (uint*)bp->data;
+	a = (uint*)bp->data;
     if((addr = a[bn]) == 0){
       a[bn] = addr = balloc(ip->dev);
       log_write(bp);
     }
     brelse(bp);
     return addr;
+  }
+
+ //mapping doubly indirect block 
+  bn-=NINDIRECT;
+  if(bn < NINDIRECT*NINDIRECT){
+  	if((addr=ip->addrs[NINDIRECT])==0)
+		ip->addrs[NINDIRECT] = addr = balloc(ip->dev); //allocating indirect address
+	bp = bread(ip->dev, addr);
+
+	b = (uint*)bp->data; // set b to addr , addr is block number
+	if((addr=b[bn/NINDIRECT])==0){ // to get bitmap :Indirect pointer's addr = bn/indirect num
+		b[bn/NINDIRECT] = addr = balloc(ip->dev);
+		log_write(bp);
+	}
+	brelse(bp);
+	
+	bp = bread(ip->dev, addr);
+	a = (uint*)bp->data;
+	if((addr=a[bn%NINDIRECT])==0){//to get bitmap : direct address = bn%indirect num
+		a[bn%NINDIRECT] = addr = balloc(ip->dev);
+		log_write(bp);
+	}
+	brelse(bp);
+	return addr;
   }
 
   panic("bmap: out of range");

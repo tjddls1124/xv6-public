@@ -51,8 +51,11 @@ sys_sbrk(void)
   if(argint(0, &n) < 0)
     return -1;
   addr = myproc()->sz;
-  if(growproc(n) < 0)
-    return -1;
+ // cprintf("size:%d\n",addr);
+  myproc()->sz += n;
+ // cprintf("size:%d\n",myproc()->sz);
+ // if(growproc(n) < 0)
+ //  return -1;
   return addr;
 }
 
@@ -88,4 +91,24 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+int sys_alarm(void){
+	int ticks;
+	void(*handler)();
+	if(argint(0,&ticks)<0)
+		return -1;
+	if(argptr(1,(char**)&handler,1)<0)
+		return -1;
+	myproc()->alarmticks = ticks;
+	myproc()->alarmhandler = handler;
+	return 0;
+	}
+
+int
+sys_date(void){
+	struct rtcdate *r; 
+	
+	argptr(0,(void*)&r,sizeof(r)); 
+	cmostime(r);
+	return 0;
 }

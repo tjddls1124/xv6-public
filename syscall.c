@@ -103,6 +103,8 @@ extern int sys_unlink(void);
 extern int sys_wait(void);
 extern int sys_write(void);
 extern int sys_uptime(void);
+extern int sys_date(void);
+extern int sys_alarm(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -126,6 +128,8 @@ static int (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_date]	  sys_date,
+[SYS_alarm]   sys_alarm,
 };
 
 void
@@ -133,10 +137,24 @@ syscall(void)
 {
   int num;
   struct proc *curproc = myproc();
-
   num = curproc->tf->eax;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
-    curproc->tf->eax = syscalls[num]();
+	 curproc->tf->eax = syscalls[num]();
+  /*    switch(num){
+		           case 1: cprintf("fork"); break;
+		           case 2: cprintf("exit"); break;
+		           case 3: cprintf("wait");break;
+		           case 4: cprintf("pipe");break;
+		           case 5: cprintf("read");break;
+		           case 7: cprintf("exec");break;
+		           case 10:cprintf("dup");break;
+		           case 15:cprintf("open");break;
+		           case 16:cprintf("write");break;
+		           case 21:cprintf("close");break;
+		  	 
+		     }
+	       cprintf(" -> %d\n",num);
+*/
   } else {
     cprintf("%d %s: unknown sys call %d\n",
             curproc->pid, curproc->name, num);
